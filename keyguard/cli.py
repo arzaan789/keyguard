@@ -116,3 +116,49 @@ def watch(path, no_redact, config_path) -> None:
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+
+
+@main.group()
+def rules() -> None:
+    """Manage detection rules."""
+
+
+@rules.command("list")
+@click.option("--config", "config_path", default=".keyguard.toml")
+def rules_list(config_path) -> None:
+    """List all active detection rules."""
+    from keyguard.engine.rules import RuleLoader
+
+    try:
+        config = load_config(config_path=config_path if config_path != ".keyguard.toml" else None)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+
+    loaded_rules = RuleLoader.load_builtin(
+        extra_rules=config.extra_rules, disabled=config.disabled_rules
+    )
+    click.echo(f"{'ID':<35} {'SEVERITY':<10} {'DESCRIPTION'}")
+    click.echo("-" * 80)
+    for r in loaded_rules:
+        click.echo(f"{r.id:<35} {r.severity:<10} {r.description}")
+    click.echo(f"\n{len(loaded_rules)} rule(s) active.")
+
+
+@main.group()
+def config() -> None:
+    """Manage keyguard configuration."""
+
+
+@config.command("check")
+@click.option("--config", "config_path", default=".keyguard.toml")
+def config_check(config_path) -> None:
+    """Validate a .keyguard.toml configuration file."""
+    from pathlib import Path
+
+    try:
+        cfg = load_config(config_path=Path(config_path))
+        click.echo(f"Config is valid. Paths: {cfg.paths}, Rules disabled: {cfg.disabled_rules}")
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)

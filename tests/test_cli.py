@@ -70,3 +70,28 @@ def test_watch_command_exists():
     result = runner.invoke(main, ["watch", "--help"])
     assert result.exit_code == 0
     assert "watch" in result.output or "Watch" in result.output
+
+
+def test_rules_list_shows_builtin_rules():
+    runner = CliRunner()
+    result = runner.invoke(main, ["rules", "list"])
+    assert result.exit_code == 0
+    assert "google-api-key" in result.output
+    assert "gcp-service-account-key" in result.output
+
+
+def test_config_check_valid(tmp_path):
+    toml = tmp_path / ".keyguard.toml"
+    toml.write_text('[scan]\npaths = ["."]\n')
+    runner = CliRunner()
+    result = runner.invoke(main, ["config", "check", "--config", str(toml)])
+    assert result.exit_code == 0
+    assert "valid" in result.output.lower() or "ok" in result.output.lower()
+
+
+def test_config_check_invalid(tmp_path):
+    toml = tmp_path / ".keyguard.toml"
+    toml.write_text("not valid toml ][[[")
+    runner = CliRunner()
+    result = runner.invoke(main, ["config", "check", "--config", str(toml)])
+    assert result.exit_code == 2
