@@ -63,3 +63,10 @@ def test_scan_json_output_writes_file(tmp_path):
     import json
     data = json.loads(out.read_text())
     assert len(data) == 1
+
+
+def test_watch_command_exists():
+    runner = CliRunner()
+    result = runner.invoke(main, ["watch", "--help"])
+    assert result.exit_code == 0
+    assert "watch" in result.output or "Watch" in result.output

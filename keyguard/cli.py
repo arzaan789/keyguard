@@ -64,3 +64,55 @@ def scan(path, output_formats, out_file, no_git_history, no_redact, config_path)
         WebhookNotifier(url=config.webhook_url, format="generic", redact=redact).report(findings)
 
     sys.exit(1 if findings else 0)
+
+
+@main.command()
+@click.argument("path", default=".")
+@click.option("--no-redact", is_flag=True, default=False)
+@click.option("--config", "config_path", default=".keyguard.toml")
+def watch(path, no_redact, config_path) -> None:
+    """Watch PATH and re-scan on file changes."""
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    from keyguard.engine.rules import RuleLoader
+    from keyguard.engine.matcher import RegexMatcher
+    from keyguard.scanner.file import FileScanner
+
+    try:
+        config = load_config(config_path=config_path if config_path != ".keyguard.toml" else None)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+
+    config.paths = [path]
+    if no_redact:
+        config.redact = False
+
+    rules = RuleLoader.load_builtin(
+        extra_rules=config.extra_rules, disabled=config.disabled_rules
+    )
+    matcher = RegexMatcher(rules)
+    reporter = TerminalReporter(redact=config.redact)
+
+    class _Handler(FileSystemEventHandler):
+        def on_modified(self, event):
+            if event.is_directory:
+                return
+            scanner = FileScanner(paths=[path], exclude=config.exclude)
+            findings = []
+            for chunk in scanner.scan_file(event.src_path):
+                findings.extend(matcher.scan(chunk))
+            if findings:
+                reporter.report(findings)
+
+    observer = Observer()
+    observer.schedule(_Handler(), path=path, recursive=True)
+    observer.start()
+    click.echo(f"Watching {path} for changes. Press Ctrl+C to stop.")
+    try:
+        while True:
+            import time
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
