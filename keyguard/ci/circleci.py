@@ -41,7 +41,7 @@ class CircleCiScanner:
         return [
             f"github/{org}/{c['name']}"
             for c in resp.json()
-            if c.get("slug", "").split("/")[0] == org
+            if c.get("slug", "").split("/")[-1] == org
         ]
 
     def _scan_variables(self, slug: str) -> Generator[CiChunk, None, None]:

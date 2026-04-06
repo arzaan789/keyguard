@@ -84,3 +84,24 @@ def test_401_skips_gracefully(mock_session_cls, capsys):
     chunks = list(scanner.scan())
     assert chunks == []
     assert "Warning" in capsys.readouterr().err
+
+
+@patch("keyguard.ci.circleci.requests.Session")
+def test_org_discovery_uses_correct_slug_part(mock_session_cls):
+    """_list_org_slugs must match org name, not VCS type (regression test for [1] not [0])."""
+    session = MagicMock()
+    mock_session_cls.return_value = session
+    session.get.side_effect = [
+        # collaborations: slug is "github/my-org", name is "repo-x"
+        _resp(200, [
+            {"slug": "github/my-org", "name": "repo-x"},
+            {"slug": "github/other-org", "name": "repo-y"},
+        ]),
+        _resp(200, []),                    # envvars for github/my-org/repo-x
+        _resp(200, {"items": []}),         # pipelines for github/my-org/repo-x
+    ]
+    cfg = _config(circleci_orgs=["my-org"])
+    scanner = CircleCiScanner(cfg)
+    list(scanner.scan())
+    # Only repo-x should be scanned (under my-org), not repo-y (under other-org)
+    assert session.get.call_count == 3  # collaborations + envvars + pipelines
