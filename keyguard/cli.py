@@ -9,6 +9,8 @@ from keyguard.output.webhook import WebhookNotifier
 from keyguard.auditor.client import GcpClient, GcpAuthError
 from keyguard.auditor.audit import audit_projects
 from keyguard.auditor.output import GcpTerminalReporter, GcpJsonExporter
+from keyguard.ci.scan import ci_scan
+from keyguard.ci.output import CiTerminalReporter, CiJsonExporter
 
 
 @click.group()
@@ -202,5 +204,55 @@ def audit(project_ids, gcp_credentials, output_formats, out_file) -> None:
 
     if "json" in output_formats and out_file:
         GcpJsonExporter(out_file=out_file).report(findings)
+
+    sys.exit(1 if findings else 0)
+
+
+@main.command()
+@click.option(
+    "--platform", default=None,
+    type=click.Choice(["github", "circleci", "gitlab"]),
+    help="Scan only this platform.",
+)
+@click.option(
+    "--repo", "repos", multiple=True,
+    help="Narrow scan to specific repo (repeatable).",
+)
+@click.option(
+    "--output", "output_formats", multiple=True,
+    type=click.Choice(["json"]),
+    help="Additional output format. Terminal is always on.",
+)
+@click.option("--out-file", default=None, help="Path for JSON output file.")
+@click.option("--config", "config_path", default=".keyguard.toml",
+              help="Path to .keyguard.toml config file.")
+def ci(platform, repos, output_formats, out_file, config_path) -> None:
+    """Scan CI platforms for exposed credentials in logs and variables."""
+    try:
+        from pathlib import Path as _Path
+        config = load_config(
+            config_path=_Path(config_path) if config_path != ".keyguard.toml" else None
+        )
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+
+    if config.ci is None:
+        click.echo(
+            "Error: No CI tokens configured in [ci] section of .keyguard.toml",
+            err=True,
+        )
+        sys.exit(2)
+
+    findings = ci_scan(
+        ci_config=config.ci,
+        platform=platform,
+        repos=list(repos) if repos else None,
+    )
+
+    CiTerminalReporter(redact=config.redact).report(findings)
+
+    if "json" in output_formats and out_file:
+        CiJsonExporter(out_file=out_file, redact=config.redact).report(findings)
 
     sys.exit(1 if findings else 0)
