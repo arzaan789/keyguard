@@ -3,10 +3,20 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "keyguard"
+name = "keyguard-scan"
 version = "0.1.0"
-description = "Scan codebases and git history for exposed credentials"
+description = "Scan codebases, GCP projects, and CI pipelines for exposed Google API credentials"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [{ name = "arzaan789", email = "arzaaan789@gmail.com" }]
+keywords = ["security", "credentials", "api-keys", "google-cloud", "gemini", "secret-scanning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3",
+]
 dependencies = [
     "click>=8.1",
     "rich>=13.0",
@@ -16,6 +26,11 @@ dependencies = [
     "requests>=2.31",
     "google-auth>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/arzaan789/keyguard"
+Repository = "https://github.com/arzaan789/keyguard"
+"Bug Tracker" = "https://github.com/arzaan789/keyguard/issues"
 
 [project.scripts]
 keyguard = "keyguard.cli:main"

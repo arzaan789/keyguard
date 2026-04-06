@@ -14,7 +14,7 @@ Scan codebases, GCP projects, and CI pipelines for exposed Google API credential
 ## Install
 
 ```bash
-pip install keyguard
+pip install keyguard-scan
 ```
 
 Or clone and install in development mode:
@@ -225,7 +225,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # full history for git scan
-      - run: pip install keyguard
+      - run: pip install keyguard-scan
       - run: keyguard scan .
 ```
 
