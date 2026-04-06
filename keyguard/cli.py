@@ -6,6 +6,9 @@ from keyguard.scan import run_scan
 from keyguard.output.terminal import TerminalReporter
 from keyguard.output.structured import JsonExporter, SarifExporter
 from keyguard.output.webhook import WebhookNotifier
+from keyguard.auditor.client import GcpClient, GcpAuthError
+from keyguard.auditor.audit import audit_projects
+from keyguard.auditor.output import GcpTerminalReporter, GcpJsonExporter
 
 
 @click.group()
@@ -162,3 +165,42 @@ def config_check(config_path) -> None:
     except ValueError as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(2)
+
+
+@main.command()
+@click.option(
+    "--project", "project_ids", multiple=True,
+    help="GCP project ID to audit (repeatable). Default: auto-discover all.",
+)
+@click.option(
+    "--gcp-credentials", default=None,
+    help="Path to service account JSON key. Default: Application Default Credentials.",
+)
+@click.option(
+    "--output", "output_formats", multiple=True,
+    type=click.Choice(["json"]),
+    help="Additional output format. Terminal is always on.",
+)
+@click.option("--out-file", default=None, help="Path for JSON output file.")
+def audit(project_ids, gcp_credentials, output_formats, out_file) -> None:
+    """Audit GCP projects for API keys with Gemini access."""
+    try:
+        client = GcpClient(credentials_file=gcp_credentials or None)
+    except GcpAuthError as exc:
+        click.echo(
+            f"Error: {exc}\n"
+            "Run `gcloud auth application-default login` "
+            "or pass `--gcp-credentials key.json`",
+            err=True,
+        )
+        sys.exit(2)
+
+    project_list = list(project_ids) if project_ids else None
+    findings = audit_projects(client, project_ids=project_list)
+
+    GcpTerminalReporter().report(findings)
+
+    if "json" in output_formats and out_file:
+        GcpJsonExporter(out_file=out_file).report(findings)
+
+    sys.exit(1 if findings else 0)
